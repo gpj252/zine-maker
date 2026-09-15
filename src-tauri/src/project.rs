@@ -34,10 +34,9 @@ pub struct PaperSize {
     pub height_mm: f64,
 }
 
-impl PaperSize {
-    pub const A4: PaperSize = PaperSize { width_mm: 210.0, height_mm: 297.0 };
-    pub const LETTER: PaperSize = PaperSize { width_mm: 215.9, height_mm: 279.4 };
-}
+// Paper size presets (A4, Letter) live only on the frontend (src/types.ts) — the project just
+// carries plain width_mm/height_mm here, no reason to duplicate the preset list on both sides
+// and risk them drifting apart.
 
 /// The imposition scheme a project uses. `OnePageZine` is always exactly 8 pages on one
 /// single-sided sheet; `Booklet` covers both the "Zine" (booklet-style, user-chosen page

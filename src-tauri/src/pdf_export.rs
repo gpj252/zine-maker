@@ -144,3 +144,54 @@ fn draw_fitted(
     image.add_to_layer(layer.clone(), transform);
     Ok(())
 }
+
+#[cfg(test)]
+mod visual_check {
+    //! Not a real regression test (needs numbered fixture images that don't ship in the repo)
+    //! — a one-off harness for eyeballing the actual rendered PDF. Run with:
+    //!   cargo test --lib visual_check -- --ignored --nocapture
+    use super::*;
+    use crate::imposition::{impose_booklet, impose_one_page_zine, BookletSide};
+    use crate::project::PageEntry;
+
+    fn test_pages(dir: &str) -> Vec<PageEntry> {
+        (1..=8)
+            .map(|i| PageEntry {
+                id: i.to_string(),
+                image_path: Some(format!("{dir}/page{i}.png")),
+            })
+            .collect()
+    }
+
+    #[test]
+    #[ignore]
+    fn one_page_zine_to_pdf() {
+        let dir = "/tmp/claude-0/-documents-TrueNAS/0b901691-aeb2-44d0-87ce-161956fca9f1/scratchpad/zine_test";
+        let sheet = impose_one_page_zine();
+        export_pdf(
+            &test_pages(dir),
+            &[sheet],
+            215.9,
+            279.4,
+            (10.0, 10.0, 10.0, 10.0),
+            &format!("{dir}/onepagezine.pdf"),
+        )
+        .expect("export should succeed");
+    }
+
+    #[test]
+    #[ignore]
+    fn duplex_booklet_to_pdf() {
+        let dir = "/tmp/claude-0/-documents-TrueNAS/0b901691-aeb2-44d0-87ce-161956fca9f1/scratchpad/zine_test";
+        let sheets = impose_booklet(8, BookletSide::Duplex);
+        export_pdf(
+            &test_pages(dir),
+            &sheets,
+            215.9,
+            279.4,
+            (10.0, 10.0, 10.0, 10.0),
+            &format!("{dir}/duplexbooklet.pdf"),
+        )
+        .expect("export should succeed");
+    }
+}

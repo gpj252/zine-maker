@@ -23,8 +23,12 @@ tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-image = "0.25"
-printpdf = "0.7"
+# Pinned to 0.24 (not the newer 0.25) to match printpdf 0.7's own internal `image` dependency
+# exactly — from_dynamic_image() takes printpdf's re-exported image::DynamicImage, and Cargo
+# only unifies the two into one crate instance (making the types the same type) if the version
+# requirements actually overlap.
+image = "0.24"
+printpdf = { version = "0.7", features = ["embedded_images"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 
 

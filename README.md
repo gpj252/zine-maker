@@ -29,15 +29,20 @@ and stapling actually comes out in the right page order without doing the math b
 - `src-tauri/src/project.rs` — the project data model and `compute_imposition`, which pads
   the page list to whatever multiple the chosen format needs and calls into `imposition.rs`.
 - `src-tauri/src/pdf_export.rs` — renders imposed sheets to a PDF via `printpdf` + `image`.
-  **Not yet visually verified** — see the warning at the top of the file.
+  Visually verified (see `pdf_export::visual_check`, `cargo test --lib visual_check --
+  --ignored --nocapture`): both the one-page-zine panel grid/rotation and the duplex
+  booklet's front/back sheet pairing render exactly as the unit tests expect. Not yet
+  verified against an *actual* printed-and-folded sheet, though — that's the next real check.
 - `src/` — the React UI: `NewProjectForm`, `PageList` (drag-reorder via `@dnd-kit`),
   `SheetPreview`.
 
 ## Status
 
-Early scaffold — the imposition math has unit tests (`cargo test`) and is the part most
-worth trusting right now. The PDF export path compiles against printpdf's documented API but
-hasn't been run against a real printer/fold yet. Do that before trusting a real print job.
+Working end to end: `cargo check`/`cargo test` pass, the frontend type-checks and builds
+(`tsc`, `vite build`), and both imposition schemes have been visually confirmed via rendered
+PDF output, not just unit-tested in the abstract. Not yet run as an actual app window
+(`npm run tauri dev`) — this environment has no display server — and not yet tested against a
+real printer/fold.
 
 ## Developing
 
