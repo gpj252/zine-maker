@@ -24,6 +24,7 @@ pub fn export_pdf(
     paper_width_mm: f64,
     paper_height_mm: f64,
     margins: (f64, f64, f64, f64), // top, right, bottom, left
+    poster_image_path: Option<&str>,
     output_path: &str,
 ) -> Result<(), String> {
     if sheets.is_empty() {
@@ -37,9 +38,11 @@ pub fn export_pdf(
         "Layer",
     );
 
-    // One PDF page per sheet side; the first side reuses the page PdfDocument::new already
-    // created, every side after that needs its own add_page call.
-    let total_sides: usize = sheets.iter().map(|s| if s.back.is_some() { 2 } else { 1 }).sum();
+    // One PDF page per sheet side, plus one more if there's a poster back to draw — the
+    // first side reuses the page PdfDocument::new already created, every side after that
+    // needs its own add_page call.
+    let total_sides: usize = sheets.iter().map(|s| if s.back.is_some() { 2 } else { 1 }).sum::<usize>()
+        + if poster_image_path.is_some() { 1 } else { 0 };
     let mut layers = vec![doc.get_page(first_page).get_layer(first_layer)];
     for _ in 1..total_sides {
         let (page, layer) =
@@ -55,6 +58,18 @@ pub fn export_pdf(
             render_side(&layers[side_index], back, pages, paper_width_mm, paper_height_mm, margins)?;
             side_index += 1;
         }
+    }
+    if let Some(poster_path) = poster_image_path {
+        let (margin_top, margin_right, margin_bottom, margin_left) = margins;
+        draw_fitted(
+            &layers[side_index],
+            poster_path,
+            margin_left,
+            margin_bottom,
+            paper_width_mm - margin_left - margin_right,
+            paper_height_mm - margin_top - margin_bottom,
+            false,
+        )?;
     }
 
     let file = File::create(output_path).map_err(|e| format!("couldn't create {output_path}: {e}"))?;
@@ -151,30 +166,62 @@ mod visual_check {
     //! — a one-off harness for eyeballing the actual rendered PDF. Run with:
     //!   cargo test --lib visual_check -- --ignored --nocapture
     use super::*;
-    use crate::imposition::{impose_booklet, impose_one_page_zine, BookletSide};
+    use crate::imposition::{impose_booklet, impose_one_page_zine, impose_sixteen_page_zine, BookletSide};
     use crate::project::PageEntry;
 
-    fn test_pages(dir: &str) -> Vec<PageEntry> {
-        (1..=8)
-            .map(|i| PageEntry {
-                id: i.to_string(),
-                image_path: Some(format!("{dir}/page{i}.png")),
-            })
+    const DIR: &str = "/tmp/claude-0/-documents-TrueNAS/0b901691-aeb2-44d0-87ce-161956fca9f1/scratchpad/zine_test";
+    const LANDSCAPE_W: f64 = 279.4; // Letter, landscape — see Format::wants_landscape_sheet
+    const LANDSCAPE_H: f64 = 215.9;
+    const PORTRAIT_W: f64 = 215.9;
+    const PORTRAIT_H: f64 = 279.4;
+
+    fn test_pages(n: usize) -> Vec<PageEntry> {
+        (1..=n)
+            .map(|i| PageEntry { id: i.to_string(), image_path: Some(format!("{DIR}/page{i}.png")) })
             .collect()
     }
 
     #[test]
     #[ignore]
     fn one_page_zine_to_pdf() {
-        let dir = "/tmp/claude-0/-documents-TrueNAS/0b901691-aeb2-44d0-87ce-161956fca9f1/scratchpad/zine_test";
-        let sheet = impose_one_page_zine();
         export_pdf(
-            &test_pages(dir),
-            &[sheet],
-            215.9,
-            279.4,
+            &test_pages(8),
+            &[impose_one_page_zine()],
+            LANDSCAPE_W,
+            LANDSCAPE_H,
             (10.0, 10.0, 10.0, 10.0),
-            &format!("{dir}/onepagezine.pdf"),
+            None,
+            &format!("{DIR}/onepagezine.pdf"),
+        )
+        .expect("export should succeed");
+    }
+
+    #[test]
+    #[ignore]
+    fn one_page_zine_poster_back_to_pdf() {
+        export_pdf(
+            &test_pages(8),
+            &[impose_one_page_zine()],
+            LANDSCAPE_W,
+            LANDSCAPE_H,
+            (10.0, 10.0, 10.0, 10.0),
+            Some(&format!("{DIR}/poster.png")),
+            &format!("{DIR}/onepagezine_poster.pdf"),
+        )
+        .expect("export should succeed");
+    }
+
+    #[test]
+    #[ignore]
+    fn sixteen_page_zine_to_pdf() {
+        export_pdf(
+            &test_pages(16),
+            &[impose_sixteen_page_zine()],
+            LANDSCAPE_W,
+            LANDSCAPE_H,
+            (10.0, 10.0, 10.0, 10.0),
+            None,
+            &format!("{DIR}/sixteenpagezine.pdf"),
         )
         .expect("export should succeed");
     }
@@ -182,15 +229,15 @@ mod visual_check {
     #[test]
     #[ignore]
     fn duplex_booklet_to_pdf() {
-        let dir = "/tmp/claude-0/-documents-TrueNAS/0b901691-aeb2-44d0-87ce-161956fca9f1/scratchpad/zine_test";
         let sheets = impose_booklet(8, BookletSide::Duplex);
         export_pdf(
-            &test_pages(dir),
+            &test_pages(8),
             &sheets,
-            215.9,
-            279.4,
+            PORTRAIT_W,
+            PORTRAIT_H,
             (10.0, 10.0, 10.0, 10.0),
-            &format!("{dir}/duplexbooklet.pdf"),
+            None,
+            &format!("{DIR}/duplexbooklet.pdf"),
         )
         .expect("export should succeed");
     }

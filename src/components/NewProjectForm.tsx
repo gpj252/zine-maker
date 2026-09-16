@@ -3,7 +3,7 @@ import type { BookletSide, Format, PaperSize, Project } from "../types";
 import { PAPER_PRESETS, ZINE_BOOKLET_PRESETS, COMIC_PRESETS } from "../types";
 
 type ProjectKind = "zine" | "comic";
-type ZineStyle = "onepage" | "booklet";
+type ZineStyle = "onepage" | "onepage-poster" | "sixteenpage" | "booklet";
 
 interface Props {
   onCreate: (project: Project) => void;
@@ -17,18 +17,24 @@ export default function NewProjectForm({ onCreate }: Props) {
   const [paperName, setPaperName] = useState<keyof typeof PAPER_PRESETS>("A4");
 
   const presets = kind === "zine" ? ZINE_BOOKLET_PRESETS : COMIC_PRESETS;
-  const isOnePage = kind === "zine" && zineStyle === "onepage";
+  // The three one-sheet zine styles are fixed page counts, no booklet page-count/duplex
+  // picker needed — only "booklet" style asks for those.
+  const isOneSheet = kind === "zine" && zineStyle !== "booklet";
 
   function create() {
-    const format: Format = isOnePage
-      ? { kind: "OnePageZine" }
-      : { kind: "Booklet", page_count: pageCount, side };
+    let format: Format;
+    if (kind === "zine" && zineStyle === "onepage") format = { kind: "OnePageZine" };
+    else if (kind === "zine" && zineStyle === "onepage-poster") format = { kind: "OnePageZinePosterBack" };
+    else if (kind === "zine" && zineStyle === "sixteenpage") format = { kind: "SixteenPageZine" };
+    else format = { kind: "Booklet", page_count: pageCount, side };
+
     const paper: PaperSize = PAPER_PRESETS[paperName];
     onCreate({
       format,
       paper,
       margins: { top_mm: 5, right_mm: 5, bottom_mm: 5, left_mm: 5 },
       pages: [],
+      poster_image_path: null,
     });
   }
 
@@ -55,6 +61,18 @@ export default function NewProjectForm({ onCreate }: Props) {
               onClick={() => setZineStyle("onepage")}
             />
             <PickerCard
+              label="One-page + poster back"
+              sub="Same 8 panels, full poster image on the back"
+              active={zineStyle === "onepage-poster"}
+              onClick={() => setZineStyle("onepage-poster")}
+            />
+            <PickerCard
+              label="16-page mini-zine"
+              sub="Single sheet, both sides — no stapling"
+              active={zineStyle === "sixteenpage"}
+              onClick={() => setZineStyle("sixteenpage")}
+            />
+            <PickerCard
               label="Booklet"
               sub="Choose a page count, staple the spine"
               active={zineStyle === "booklet"}
@@ -64,7 +82,15 @@ export default function NewProjectForm({ onCreate }: Props) {
         </fieldset>
       )}
 
-      {!isOnePage && (
+      {isOneSheet && (
+        <div className="mb-6 rounded-md bg-zinc-800/60 px-3 py-2 text-sm text-zinc-400">
+          {zineStyle === "sixteenpage"
+            ? "Uses exactly 16 pages — any missing pages are auto-filled with blanks."
+            : "Uses exactly 8 pages — any missing pages are auto-filled with blanks."}
+        </div>
+      )}
+
+      {!isOneSheet && (
         <>
           <fieldset className="mb-6">
             <legend className="mb-2 text-sm font-medium text-zinc-400">Page count</legend>

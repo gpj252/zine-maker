@@ -1,18 +1,35 @@
 import { useEffect, useState } from "react";
 import type { ImpositionResult, Margins, PageEntry, Project } from "./types";
+import { effectivePaperSize } from "./types";
 import NewProjectForm from "./components/NewProjectForm";
 import PageList from "./components/PageList";
 import SheetPreview from "./components/SheetPreview";
-import { exportProjectPdf, getImposition, pickImages, pickSaveLocation } from "./lib/tauri";
+import {
+  assetUrl,
+  exportProjectPdf,
+  getImposition,
+  pickImage,
+  pickImages,
+  pickSaveLocation,
+} from "./lib/tauri";
 
 function newId() {
   return crypto.randomUUID();
 }
 
 function formatLabel(project: Project): string {
-  if (project.format.kind === "OnePageZine") return "One-page zine (8 panels)";
-  const { page_count, side } = project.format;
-  return `${page_count}-page booklet · ${side === "Duplex" ? "duplex" : "single-sided"}`;
+  switch (project.format.kind) {
+    case "OnePageZine":
+      return "One-page zine (8 panels)";
+    case "OnePageZinePosterBack":
+      return "One-page zine + poster back";
+    case "SixteenPageZine":
+      return "16-page mini-zine (1 sheet)";
+    case "Booklet": {
+      const { page_count, side } = project.format;
+      return `${page_count}-page booklet · ${side === "Duplex" ? "duplex" : "single-sided"}`;
+    }
+  }
 }
 
 export default function App() {
@@ -62,6 +79,16 @@ export default function App() {
     updatePages([...project!.pages, { id: newId(), image_path: null }]);
   }
 
+  async function pickPoster() {
+    const path = await pickImage();
+    if (!path) return;
+    setProject((p) => (p ? { ...p, poster_image_path: path } : p));
+  }
+
+  function clearPoster() {
+    setProject((p) => (p ? { ...p, poster_image_path: null } : p));
+  }
+
   async function handleExport() {
     const outputPath = await pickSaveLocation("zine.pdf");
     if (!outputPath) return;
@@ -74,7 +101,10 @@ export default function App() {
     }
   }
 
-  const paperAspect = project.paper.width_mm / project.paper.height_mm;
+  // Mirrors Rust's effective_paper_size(): the one-sheet zine grids print on a landscape
+  // sheet regardless of which paper preset (portrait by default) is selected.
+  const effectivePaper = effectivePaperSize(project.format, project.paper);
+  const paperAspect = effectivePaper.width_mm / effectivePaper.height_mm;
 
   return (
     <div className="flex h-screen bg-zinc-950 text-zinc-100">
@@ -112,6 +142,30 @@ export default function App() {
           <PageList pages={project.pages} onChange={updatePages} />
         </div>
 
+        {project.format.kind === "OnePageZinePosterBack" && (
+          <div className="mb-4 rounded-md border border-zinc-700 bg-zinc-800/50 p-3">
+            <div className="mb-2 text-sm font-medium text-zinc-300">Poster (back side)</div>
+            {project.poster_image_path ? (
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate text-xs text-zinc-400">{project.poster_image_path}</span>
+                <button
+                  onClick={clearPoster}
+                  className="flex-none text-xs text-zinc-500 hover:text-zinc-300"
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={pickPoster}
+                className="w-full rounded-md bg-zinc-700 py-1.5 text-sm text-zinc-200 hover:bg-zinc-600"
+              >
+                + Choose poster image
+              </button>
+            )}
+          </div>
+        )}
+
         <MarginsEditor margins={project.margins} onChange={updateMargins} />
 
         <button
@@ -128,6 +182,31 @@ export default function App() {
           Print preview
         </h3>
         <SheetPreview imposition={imposition} pages={project.pages} paperAspect={paperAspect} />
+        {project.format.kind === "OnePageZinePosterBack" && (
+          <PosterPreview path={project.poster_image_path} paperAspect={paperAspect} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PosterPreview({ path, paperAspect }: { path: string | null; paperAspect: number }) {
+  return (
+    <div className="mt-6">
+      <div className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+        Poster (back side)
+      </div>
+      <div className="mx-auto w-full max-w-[420px]">
+        <div
+          className="flex items-center justify-center overflow-hidden rounded-md border border-zinc-700 bg-zinc-900"
+          style={{ aspectRatio: paperAspect }}
+        >
+          {path ? (
+            <img src={assetUrl(path)} alt="" className="h-full w-full object-contain" />
+          ) : (
+            <span className="text-xs text-zinc-600">No poster image chosen</span>
+          )}
+        </div>
       </div>
     </div>
   );

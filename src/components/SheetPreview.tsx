@@ -71,10 +71,10 @@ function SideCard({
   paperAspect: number;
 }) {
   return (
-    <div>
+    <div className="mx-auto w-full max-w-[420px]">
       <div className="mb-1 text-[11px] text-zinc-500">{label}</div>
       <div
-        className="grid gap-px overflow-hidden rounded-md border border-zinc-700 bg-zinc-700"
+        className="grid w-full gap-px overflow-hidden rounded-md border border-zinc-700 bg-zinc-700"
         style={{
           aspectRatio: paperAspect,
           gridTemplateColumns: `repeat(${side.cols}, 1fr)`,

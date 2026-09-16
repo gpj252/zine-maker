@@ -5,7 +5,24 @@ export type BookletSide = "Duplex" | "Single";
 
 export type Format =
   | { kind: "OnePageZine" }
+  | { kind: "OnePageZinePosterBack" }
+  | { kind: "SixteenPageZine" }
   | { kind: "Booklet"; page_count: number; side: BookletSide };
+
+/// Mirrors Format::wants_landscape_sheet() in project.rs — the one-sheet zine grids (8-panel
+/// and 16-page) are 4 columns x 2 rows and were verified against sources that print them on a
+/// landscape sheet, not the portrait orientation the paper-size presets otherwise assume.
+export function formatWantsLandscapeSheet(format: Format): boolean {
+  return format.kind === "OnePageZine" || format.kind === "OnePageZinePosterBack" || format.kind === "SixteenPageZine";
+}
+
+/// Mirrors effective_paper_size() in project.rs.
+export function effectivePaperSize(format: Format, paper: PaperSize): PaperSize {
+  if (formatWantsLandscapeSheet(format) && paper.height_mm > paper.width_mm) {
+    return { width_mm: paper.height_mm, height_mm: paper.width_mm };
+  }
+  return paper;
+}
 
 export interface PaperSize {
   width_mm: number;
@@ -34,6 +51,9 @@ export interface Project {
   paper: PaperSize;
   margins: Margins;
   pages: PageEntry[];
+  /// Only meaningful for `{ kind: "OnePageZinePosterBack" }` — the image drawn full-bleed on
+  /// the sheet's back side.
+  poster_image_path: string | null;
 }
 
 export interface Slot {

@@ -65,17 +65,42 @@ pub fn pad_to_multiple(page_count: usize, multiple: usize) -> usize {
 /// row2 (0°):     6     7     8     1
 /// ```
 pub fn impose_one_page_zine() -> Sheet {
-    const TOP: [usize; 4] = [5, 4, 3, 2];
-    const BOTTOM: [usize; 4] = [6, 7, 8, 1];
-    let slots = TOP
-        .iter()
-        .map(|&p| Slot { page: Some(p), rotated: true })
-        .chain(BOTTOM.iter().map(|&p| Slot { page: Some(p), rotated: false }))
-        .collect();
+    Sheet { front: eight_panel_side(&[5, 4, 3, 2], true, &[6, 7, 8, 1], false), back: None }
+}
+
+/// The classic 16-page mini-zine: the same one-sheet fold as [`impose_one_page_zine`], but
+/// printed on BOTH sides — 8 physical panel positions x 2 faces = 16 reader pages, no
+/// stapling, cut + fold only. Grid verified against a real, working reference implementation
+/// — github.com/colarusso/mini-zine's index.html/zine_text.js, which hardcodes this exact
+/// front/back page numbering (and confirms every one of the 4 attempts I made deriving this
+/// from the fold mechanics alone was wrong — this is sourced, not derived).
+/// Print instructions from that source: portrait content, two-sided, long-edge binding, on a
+/// **landscape** sheet (11in x 8.5in / ~297x210mm) — not portrait paper like the 8-page
+/// version defaults to. See [`crate::project::Format::sheet_orientation`].
+///
+/// ```text
+/// FRONT            col1  col2  col3  col4      BACK             col1  col2  col3  col4
+/// row1 (0°):         16    1     4    13        row1 (0°):         10    7     6    11
+/// row2 (180°):        9    8     5    12        row2 (180°):       15    2     3    14
+/// ```
+pub fn impose_sixteen_page_zine() -> Sheet {
     Sheet {
-        front: SheetSide { rows: 2, cols: 4, slots },
-        back: None,
+        front: eight_panel_side(&[16, 1, 4, 13], false, &[9, 8, 5, 12], true),
+        back: Some(eight_panel_side(&[10, 7, 6, 11], false, &[15, 2, 3, 14], true)),
     }
+}
+
+/// Shared by both one-sheet zine schemes: a 2x4 grid built from a top and bottom row, each
+/// independently rotated or not — [`impose_one_page_zine`] rotates its top row, while
+/// [`impose_sixteen_page_zine`] rotates its bottom row instead (confirmed against each
+/// scheme's own verified source, not assumed to match between the two).
+fn eight_panel_side(top: &[usize; 4], top_rotated: bool, bottom: &[usize; 4], bottom_rotated: bool) -> SheetSide {
+    let slots = top
+        .iter()
+        .map(|&p| Slot { page: Some(p), rotated: top_rotated })
+        .chain(bottom.iter().map(|&p| Slot { page: Some(p), rotated: bottom_rotated }))
+        .collect();
+    SheetSide { rows: 2, cols: 4, slots }
 }
 
 /// How a multi-sheet booklet's sheets get printed.
@@ -195,6 +220,39 @@ mod tests {
         let mut seen: Vec<usize> = pages.into_iter().flatten().collect();
         seen.sort_unstable();
         assert_eq!(seen, (1..=8).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn sixteen_page_zine_matches_reference_grid() {
+        let sheet = impose_sixteen_page_zine();
+        let front: Vec<Option<usize>> = sheet.front.slots.iter().map(|s| s.page).collect();
+        assert_eq!(
+            front,
+            vec![
+                Some(16), Some(1), Some(4), Some(13),
+                Some(9), Some(8), Some(5), Some(12),
+            ]
+        );
+        // Top row un-rotated, bottom row rotated — opposite of the 8-page scheme.
+        assert!(sheet.front.slots[0..4].iter().all(|s| !s.rotated));
+        assert!(sheet.front.slots[4..8].iter().all(|s| s.rotated));
+
+        let back_side = sheet.back.expect("16-page zine is double-sided");
+        let back: Vec<Option<usize>> = back_side.slots.iter().map(|s| s.page).collect();
+        assert_eq!(
+            back,
+            vec![
+                Some(10), Some(7), Some(6), Some(11),
+                Some(15), Some(2), Some(3), Some(14),
+            ]
+        );
+        assert!(back_side.slots[0..4].iter().all(|s| !s.rotated));
+        assert!(back_side.slots[4..8].iter().all(|s| s.rotated));
+
+        // Every reader page 1-16 appears exactly once across both sides.
+        let mut seen: Vec<usize> = front.into_iter().chain(back).flatten().collect();
+        seen.sort_unstable();
+        assert_eq!(seen, (1..=16).collect::<Vec<_>>());
     }
 
     #[test]

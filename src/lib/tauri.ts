@@ -22,6 +22,15 @@ export async function pickImages(): Promise<string[] | null> {
   return Array.isArray(result) ? result : [result];
 }
 
+/** Single-file variant of pickImages(), for the poster-back picker. */
+export async function pickImage(): Promise<string | null> {
+  const result = await open({
+    multiple: false,
+    filters: [{ name: "Images", extensions: IMAGE_EXTENSIONS }],
+  });
+  return typeof result === "string" ? result : null;
+}
+
 export function pickSaveLocation(defaultName: string): Promise<string | null> {
   return save({
     defaultPath: defaultName,
